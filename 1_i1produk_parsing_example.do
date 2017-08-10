@@ -1,18 +1,27 @@
 
 clear all
 set more off
-cd c:\OneDrive\IFLS\IFLS1
-use hh93dta\buk3tk2.dta, clear
+cd D:\OneDrive\IFLS\IFLS1
 
-* General
+use hh93dta\buk3tk2.dta, clear
 egen j1g = msub(tk19a), f(" DAN " & + \ / . = : ; _ , "(" ")" [ ]) r(|)
-keep tk19a j1g
-replace j1g = subinstr(j1g," ","",.)
 split j1g, parse(|)
+foreach x of varlist j1g? {
+	replace `x' = trim(itrim(`x'))
+	}
+keep j1g?
+
+save j1g_tk19a, replace
+
+stack j1g?, into(j1goods)
+contract j1goods
+drop if inlist(j1goods,"","W","X","Y","Z","DLL")
+gsort -_freq
+
 
 gen a = "PADI"
 
-matchit j1g1 a, g(b)
+matchit j1g1 j1g2, g(b)
 
 
 list j1g1 if regexm(j1g1, "([A-Z]+)-([A-Z]+)(AN)") & regexs(1)==regexs(2)
