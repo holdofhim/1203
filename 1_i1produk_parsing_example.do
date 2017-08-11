@@ -1,48 +1,48 @@
 
 clear all
 set more off
-cd D:\OneDrive\IFLS\IFLS1
+cd D:\OneDrive\1203\IFLS1
+
 
 use hh93dta\buk3tk2.dta, clear
-egen j1g = msub(tk19a), f(" DAN " & + \ / . = : ; _ , "(" ")" [ ]) r(|)
+
+* Cleaning and Parsing
+egen  temp1 = msub(tk19a), f(" DAN " " ATAU " & + \ / = : ; _ , "(" ")" [ ]) r(|)
+egen  temp2 = msub(temp1), f(BHN HSL RT) r(BAHAN HASIL RETAIL) w
+egen  temp3 = msub(temp2), f(. ' -2 DLL) r()
+gen   j1g = regexr(temp3, "[0-9][0-9]*","")
+replace j1g = regexr(j1g, "[ ]*-[ ]*", "-")
+replace j1g = regexr(j1g, "[BPM]?E?[A-Z]?JU[A]?L(AN)?[ ,]*(BELI)?", " SALES ")		// JUAL BELI, JUALBELI, JUAL-BELI, ***JUAL**
+replace j1g = regexr(j1g, "[A-Z]?[A-Z]?[A-Z]?DAGANG(AN)?|EXPORT[ ,]*(IMPORT)?", " TRADE ")
+replace j1g = regexr(j1g, "J[A]?S[A]?|SERVIS[E]?|PELAYAN(AN)?", " SERVICES ")
+replace j1g = regexr(j1g, "(PER)?(PENG)?USAHA(AN)?", " BUSINESS ")
+replace j1g = regexr(j1g, "K(EBUTUHAN)?(EPERLUAN)?(ONSUMSI)?[ ,]*(HIDUP)?[ ,]*SEHA[R]?I[ ,]*((SE)?H[A]?R[I]?)?", " GROCERY ")
+replace j1g = regexr(j1g, "KELON[G]?TON[G]?(AN)?", " GROCERY ")
+replace j1g = regexr(j1g, "M[A]?K[A]?N(AN)?", " FOOD ")
+replace j1g = regexr(j1g, "KC[G]?", " KACANG ")
+replace j1g = regexr(j1g, "(MEM)?PRODUKSI", " ")
+replace j1g = regexr(j1g, "DAN SALES", " ")
+replace j1g = trim(itrim(j1g))
+
 split j1g, parse(|)
 foreach x of varlist j1g? {
 	replace `x' = trim(itrim(`x'))
 	}
 keep j1g?
+stack j1g?, into(j1goods)
+drop if j1goods=="" | strlen(j1goods)<=2
+replace j1goods = subinstr(j1g,regexs(3),"",1) if regexm(j1g, "([A-Z]+)-([A-Z]+)(AN)")
+contract j1goods
+gsort -_freq
 
 save j1g_tk19a, replace
-
-stack j1g?, into(j1goods)
-contract j1goods
-drop if inlist(j1goods,"","W","X","Y","Z","DLL")
-gsort -_freq
 
 
 gen a = "PADI"
 
 matchit j1g1 j1g2, g(b)
 
-
-list j1g1 if regexm(j1g1, "([A-Z]+)-([A-Z]+)(AN)") & regexs(1)==regexs(2)
-
-replace j1g1 = subinstr(j1g1,"-"+regexs(2)+regexs(3), " , ", 1) if regexm(j1g1, "([A-Z]+)-([A-Z]+)(AN)") & regexs(1)==regexs(2)
-replace j1g1 = subinstr(j1g1,"-"+regexs(2), " , ", 1) if regexm(j1g1, "([A-Z]+)-([A-Z]+)") & regexs(1)==regexs(2)
-replace j1g1 = regexr(j1g1, "[ ]*-[ ]*", " ")
-replace j1g1 = regexr(j1g1, "[ ]*-[ ]*", " ")
-replace j1g1 = regexr(j1g1, "[BPM]?E?[A-Z]?JU[A]?L(AN)?[ ,]*(BELI)?", " , SALES , ")		// JUAL BELI, JUALBELI, JUAL-BELI, ***JUAL**
-replace j1g1 = regexr(j1g1, "[A-Z]?[A-Z]?[A-Z]?DAGANG(AN)?|EXPORT[ ,]*(IMPORT)?", " , TRADE ,")
-replace j1g1 = regexr(j1g1, "J[A]?S[A]?|SERVIS[E]?|PELAYAN(AN)?", " , SERVICES , ")
-replace j1g1 = regexr(j1g1, "(PER)?(PENG)?USAHA(AN)?", " , BUSINESS , ")
-replace j1g1 = regexr(j1g1, "K(EBUTUHAN)?(EPERLUAN)?(ONSUMSI)?[ ,]*(HIDUP)?[ ,]*SEHA[R]?I[ ,]*((SE)?H[A]?R[I]?)?", " , GROCERY , ")
-replace j1g1 = regexr(j1g1, "KELON[G]?TON[G]?(AN)?", " , GROCERY , ")
-replace j1g1 = regexr(j1g1, "M[A]?K[A]?N(AN)?", " , FOOD , ")
-
-egen j1g2 = msub(j1g1), f(BHN RT PEMASANGANMEKANIK WARUNG AIR ES PRABOTAN) 	///
-							r(" , BAHAN , " " , RETAIL , " "PEMASANGAN MEKANIK" " , STORE , " WATER ICE " , FURNITURE , ") w	
-egen j1g3 = msub(j1g2), f(DISTRIBUTOR ADMINISTRASI "MEDIA MASSA" "SURAT MENYURAT") 	///
-							r(" , DISTRIBUTOR , " " , ADMINISTRASI , " "" "WRITING LETTER")
-egen j1good = msub(j1g3), f(DLL ATAU KLUI XAN PNJG DSB TLR TNH TTG KLP JADI SEHARI) n(1) w
+egen j1g2 = msub(j1g), f(BHN RT PEMASANGANMEKANIK) r(BAHAN RETAIL "PEMASANGAN MEKANIK") w	
 replace j1good = trim(itrim(j1good))
 replace j1good = regexr(j1good, "^[, ]+", "")
 replace j1good = regexr(j1good, "[ ,]+$", "")
@@ -55,8 +55,6 @@ save j1good, replace
 * Agricultural Products
 use j1good, clear
 egen j1g1 = msub(j1good), f("PADI LADANG" "PADI GOGO" "PADI SAWAH" PARI PADAI GABAH BERAS NASI SAWAH) r(" , RICE , ")
-replace j1g1 = regexr(j1g1, "P[AO]?L[AO]?W[I]?J[AO]?", " , VEGETABLE , ")	// PALAWIJA or POLOWIJO
-replace j1g1 = regexr(j1g1, "KC[G]?", "KACANG")								// KACANG
 replace j1g1 = regexr(j1g1, "(KACANG)?[ ]?KEDEL[AEI][I]?", " , SOYBEAN , ")	// KACANG KEDELEI
 replace j1g1 = regexr(j1g1, "J[A]?G[U]?N[G]?", " , CORN , ")				// JAGUNG
 replace j1g1 = regexr(j1g1, "[SM][A]?[S]?YUR(AN)?[ ]?([SM]AYUR(AN)?)?", " , VEGETABLE , ")	// SAYUR-SAYURAN
